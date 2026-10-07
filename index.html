@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3f5f8" />
+    <title>투자 포트폴리오 | 자산관리</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="주 메뉴">
+        <a class="brand" href="#overview" aria-label="자산관리 홈">
+          <span class="brand-mark" aria-hidden="true">N</span>
+          <span class="brand-name">NORTHSTAR<span>INVESTMENT</span></span>
+        </a>
+
+        <div class="workspace-label">자산관리</div>
+        <nav class="navigation">
+          <a class="nav-item active" href="#overview" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg>
+            포트폴리오 현황
+          </a>
+          <a class="nav-item" href="#investments">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6.5 16V9m5 7V4.5m5 11.5v-4"/><path d="m5 6 5-2 5 4 4-3"/></svg>
+            투자건 관리
+          </a>
+          <a class="nav-item" href="#allocation">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8.5h8.5A8.5 8.5 0 1 1 12 3.5Z"/><path d="M15 3.8a8.5 8.5 0 0 1 5.2 5.2H15V3.8Z"/></svg>
+            자산 배분
+          </a>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="sidebar-divider"></div>
+          <div class="profile">
+            <div class="avatar">김</div>
+            <div class="profile-copy"><strong>김민서</strong><span>투자관리팀</span></div>
+            <span class="profile-menu" aria-hidden="true">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>자산관리</span><span class="crumb-separator">/</span><strong>포트폴리오 현황</strong></div>
+          <div class="topbar-right"><span class="environment"><i></i> 내부 시스템</span><span class="topbar-divider"></span><span class="today" id="today"></span></div>
+        </header>
+
+        <div class="page-content">
+          <section class="page-heading">
+            <div>
+              <div class="eyebrow">INVESTMENT OVERVIEW</div>
+              <h1>포트폴리오 현황</h1>
+              <p class="page-description">보유 투자자산의 규모와 성과를 한눈에 확인합니다.</p>
+            </div>
+            <button class="period-button" type="button" aria-label="조회 기준: 전체 투자건">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5v3m10-3v3M4.5 9h15M5.5 5.5h13a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1Z"/></svg>
+              전체 투자건
+              <span class="chevron">⌄</span>
+            </button>
+          </section>
+
+          <section class="summary-grid" aria-label="포트폴리오 요약">
+            <article class="summary-card">
+              <div class="summary-top"><span>총 투자금액</span><span class="summary-icon blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h15.5a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-13a2 2 0 0 1 2-2h12"/><path d="M16 12.5h4.5v4H16a2 2 0 0 1 0-4Z"/><path d="M16.5 14.5h.1"/></svg></span></div>
+              <div class="summary-value" id="total-investment">—</div>
+              <div class="summary-foot"><span>전체 투자건 기준</span><span class="foot-dot"></span></div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-top"><span>총 OPB</span><span class="summary-icon teal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6.5 16V9m5 7V4.5m5 11.5v-4"/><path d="m5 6 5-2 5 4 4-3"/></svg></span></div>
+              <div class="summary-value" id="total-opb">—</div>
+              <div class="summary-foot"><span>현재 잔액 기준</span><span class="foot-dot"></span></div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-top"><span>투자건수</span><span class="summary-icon violet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5h11a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 19V7A1.5 1.5 0 0 1 8 5.5Z"/><path d="M4 16.5V5a1.5 1.5 0 0 1 1.5-1.5h11M10 10h7m-7 4h7"/></svg></span></div>
+              <div class="summary-value" id="investment-count">—</div>
+              <div class="summary-foot"><span>활성 투자건</span><span class="foot-dot"></span></div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-top"><span>평균 수익률</span><span class="summary-icon amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5 9 13l3.5 3.5L20 8"/><path d="M14.5 8H20v5.5"/></svg></span></div>
+              <div class="summary-value" id="average-return">—</div>
+              <div class="summary-foot"><span>투자건 단순 평균</span><span class="foot-dot"></span></div>
+            </article>
+          </section>
+
+          <section class="analytics-grid">
+            <article class="panel allocation-panel" id="allocation">
+              <div class="panel-heading">
+                <div><h2>자산분류별 투자금액</h2><p>자산 유형에 따른 투자 비중</p></div>
+                <span class="panel-unit">단위: 억원</span>
+              </div>
+              <div class="chart-area">
+                <div class="chart-center"><span>총 투자금액</span><strong id="chart-total">—</strong></div>
+                <div class="donut-chart" id="donut-chart" role="img" aria-label="자산분류별 투자금액 도넛 차트"><div class="donut-hole"></div></div>
+              </div>
+              <div class="legend" id="chart-legend" aria-label="차트 범례"></div>
+            </article>
+
+            <article class="panel insight-panel">
+              <div class="panel-heading"><div><h2>포트폴리오 요약</h2><p>현재 구성 기준</p></div><span class="insight-mark">i</span></div>
+              <div class="insight-total"><span>투자자산 대비 OPB</span><strong id="opb-ratio">—</strong></div>
+              <div class="ratio-track"><span id="ratio-fill"></span></div>
+              <div class="ratio-labels"><span>총 OPB</span><strong id="ratio-detail">—</strong></div>
+              <div class="insight-divider"></div>
+              <div class="insight-row"><span>가장 높은 수익률</span><div><strong id="top-return-name">—</strong><span class="positive" id="top-return-value">—</span></div></div>
+              <div class="insight-row"><span>가장 빠른 만기</span><div><strong id="nearest-maturity-name">—</strong><span id="nearest-maturity-date">—</span></div></div>
+              <div class="insight-note"><span class="note-icon">↗</span><span>수익률은 입력된 투자건별 수익률의 단순 평균으로 표시합니다.</span></div>
+            </article>
+          </section>
+
+          <section class="panel investments-panel" id="investments">
+            <div class="table-heading">
+              <div><h2>투자건 목록</h2><p>등록된 투자자산의 상세 현황입니다.</p></div>
+              <span class="record-count"><i></i><span id="record-count">0</span>건</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th scope="col">투자건명</th><th scope="col">자산분류</th><th scope="col">투자지역</th><th scope="col" class="numeric">투자금액</th><th scope="col" class="numeric">OPB</th><th scope="col" class="numeric">수익률</th><th scope="col">만기일</th></tr></thead>
+                <tbody id="investment-rows"></tbody>
+                <tfoot id="investment-total-row"></tfoot>
+              </table>
+            </div>
+            <div class="table-footer"><span>총 <strong id="footer-count">0</strong>건의 투자건</span><span>데이터 기준 <strong id="data-as-of">—</strong></span></div>
+          </section>
+          <footer class="page-footer"><span>© 2026 NORTHSTAR INVESTMENT</span><span>CONFIDENTIAL · 내부용</span></footer>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
