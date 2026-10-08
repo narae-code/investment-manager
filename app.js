@@ -21,6 +21,8 @@ function loadInvestments() {
 }
 
 const investments = loadInvestments();
+let searchTerm = '';
+let editingIndex = null;
 function saveInvestments() {
   localStorage.setItem(storageKey, JSON.stringify(investments));
 }
@@ -57,7 +59,9 @@ function renderSummary() {
 }
 
 function renderInvestments() {
-  const rows = investments.map((item, index) => `
+  const visibleInvestments = investments.map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.name.toLocaleLowerCase('ko-KR').includes(searchTerm.trim().toLocaleLowerCase('ko-KR')))
+  const rows = visibleInvestments.map(({ item, index }) => `
     <tr>
       <td><span class="project-name"><span class="project-initial ${item.color}">${escapeHtml(item.name[0])}</span>${escapeHtml(item.name)}</span></td>
       <td><span class="category-pill">${escapeHtml(item.category)}</span></td>
@@ -66,9 +70,12 @@ function renderInvestments() {
       <td class="numeric amount">${numberFormat.format(item.opb)}억</td>
       <td class="numeric return-value">${percent(item.returnRate)}</td>
       <td class="date-cell">${item.maturity.replaceAll('-', '.')}</td>
-      <td class="row-action"><button class="delete-investment-button" type="button" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 삭제">삭제</button></td>
+      <td class="row-action"><button class="edit-investment-button" type="button" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 수정">수정</button><button class="delete-investment-button" type="button" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 삭제">삭제</button></td>
     </tr>`).join('');
   document.querySelector('#investment-rows').innerHTML = rows;
+  document.querySelectorAll('.edit-investment-button').forEach((button) => {
+    button.addEventListener('click', () => openEditDialog(Number(button.dataset.investmentIndex)));
+  });
   document.querySelectorAll('.delete-investment-button').forEach((button) => {
     button.addEventListener('click', () => {
       const index = Number(button.dataset.investmentIndex);
@@ -82,31 +89,41 @@ function renderInvestments() {
     });
   });
 
-  const totalInvestment = investments.reduce((sum, item) => sum + item.amount, 0);
-  const totalOpb = investments.reduce((sum, item) => sum + item.opb, 0);
-  document.querySelector('#investment-total-row').innerHTML = `<tr><td colspan="4">합계</td><td class="numeric">${numberFormat.format(totalInvestment)}억</td><td class="numeric">${numberFormat.format(totalOpb)}억</td><td class="numeric">—</td><td>—</td></tr>`;
+  const totalInvestment = visibleInvestments.reduce((sum, { item }) => sum + item.amount, 0);
+  const totalOpb = visibleInvestments.reduce((sum, { item }) => sum + item.opb, 0);
+  const averageReturn = visibleInvestments.length
+    ? visibleInvestments.reduce((sum, { item }) => sum + item.returnRate, 0) / visibleInvestments.length
+    : null;
+  document.querySelector('#record-count').textContent = visibleInvestments.length;
+  document.querySelector('#footer-count').textContent = visibleInvestments.length;
+  document.querySelector('#investment-total-row').innerHTML = `<tr><td colspan="3">합계</td><td class="numeric">${numberFormat.format(totalInvestment)}억</td><td class="numeric">${numberFormat.format(totalOpb)}억</td><td class="numeric">${averageReturn === null ? '—' : percent(averageReturn)}</td><td class="numeric">—</td><td>—</td></tr>`;
 }
 
-function renderAllocation() {
-  const totals = investments.reduce((categories, item) => {
-    categories[item.category] = (categories[item.category] || 0) + item.amount;
-    return categories;
+function renderDonut(groupKey, chartId, legendId, totalId, label) {
+  const totals = investments.reduce((groups, item) => {
+    groups[item[groupKey]] = (groups[item[groupKey]] || 0) + item.amount;
+    return groups;
   }, {});
   const entries = Object.entries(totals);
   const totalInvestment = investments.reduce((sum, item) => sum + item.amount, 0);
-  let angle = 0;
-  const slices = entries.map(([, amount], index) => {
-    const end = angle + amount / totalInvestment * 360;
-    const slice = `${chartColors[index]} ${angle}deg ${end}deg`;
-    angle = end;
-    return slice;
-  });
+  const chart = document.querySelector(chartId);
+  const circumference = 2 * Math.PI * 48;
+  let offset = 0;
+  chart.innerHTML = totalInvestment ? `<svg viewBox="0 0 120 120" aria-hidden="true">${entries.map(([name, amount], index) => {
+    const length = amount / totalInvestment * circumference;
+    const segment = `<circle class="donut-slice" cx="60" cy="60" r="48" fill="none" stroke="${chartColors[index % chartColors.length]}" stroke-width="20" stroke-dasharray="${length} ${circumference - length}" stroke-dashoffset="${-offset}"><title>${escapeHtml(name)}: ${numberFormat.format(amount)}억</title></circle>`;
+    offset += length;
+    return segment;
+  }).join('')}</svg>` : '<svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="48" fill="none" stroke="#e9edf2" stroke-width="20" /></svg>';
+  chart.setAttribute('aria-label', `${label}: ${entries.map(([name, amount]) => `${name} ${numberFormat.format(amount)}억원`).join(', ') || '데이터 없음'}`);
+  document.querySelector(totalId).textContent = `${numberFormat.format(totalInvestment)}억`;
+  document.querySelector(legendId).innerHTML = entries.map(([name, amount], index) => `
+    <span class="legend-item"><i class="legend-swatch" style="background:${chartColors[index % chartColors.length]}"></i>${escapeHtml(name)}<strong>${totalInvestment ? Math.round(amount / totalInvestment * 100) : 0}%</strong></span>`).join('');
+}
 
-  const chart = document.querySelector('#donut-chart');
-  chart.style.background = `conic-gradient(${slices.join(', ')})`;
-  chart.setAttribute('aria-label', entries.map(([category, amount]) => `${category} ${numberFormat.format(amount)}억원`).join(', '));
-  document.querySelector('#chart-legend').innerHTML = entries.map(([category, amount], index) => `
-    <span class="legend-item"><i class="legend-swatch" style="background:${chartColors[index]}"></i>${category}<strong>${Math.round(amount / totalInvestment * 100)}%</strong></span>`).join('');
+function renderAllocation() {
+  renderDonut('category', '#donut-chart', '#chart-legend', '#chart-total', '자산분류별 투자금액');
+  renderDonut('region', '#region-donut-chart', '#region-chart-legend', '#region-chart-total', '투자지역별 투자금액');
 }
 
 function escapeHtml(value) {
@@ -120,11 +137,17 @@ renderSummary();
 renderInvestments();
 renderAllocation();
 
+document.querySelector('#investment-search').addEventListener('input', (event) => {
+  searchTerm = event.target.value;
+  renderInvestments();
+});
+
 const dialog = document.querySelector('#investment-dialog');
 const form = document.querySelector('#investment-form');
 const opbInput = document.querySelector('#investment-opb');
 const amountInput = document.querySelector('#investment-amount');
 const maturityInput = document.querySelector('#investment-maturity');
+const returnInput = document.querySelector('#investment-return');
 maturityInput.addEventListener('input', () => {
   const digits = maturityInput.value.replace(/\D/g, '').slice(0, 8);
   maturityInput.value = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4, 6)}${digits.length > 6 ? `-${digits.slice(6)}` : ''}` : digits;
@@ -143,10 +166,6 @@ maturityInput.addEventListener('blur', () => {
   }
 });
 
-document.querySelector('#open-investment-modal').addEventListener('click', () => dialog.showModal());
-document.querySelector('#close-investment-modal').addEventListener('click', () => dialog.close());
-document.querySelector('#cancel-investment').addEventListener('click', () => dialog.close());
-
 function validateOpb() {
   const amount = Number(amountInput.value);
   const opb = Number(opbInput.value);
@@ -158,22 +177,196 @@ maturityInput.addEventListener('input', () => maturityInput.setCustomValidity(''
 opbInput.addEventListener('input', validateOpb);
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
 
+function openEditDialog(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= investments.length) return;
+  editingIndex = index;
+  const item = investments[index];
+  form.elements.name.value = item.name;
+  form.elements.category.value = item.category;
+  form.elements.region.value = item.region;
+  form.elements.amount.value = item.amount;
+  form.elements.opb.value = item.opb;
+  form.elements.returnRate.value = Number(item.returnRate).toFixed(2);
+  form.elements.maturity.value = item.maturity;
+  document.querySelector('#dialog-title').textContent = '투자건 수정';
+  document.querySelector('.dialog-heading .eyebrow').textContent = 'EDIT INVESTMENT';
+  document.querySelector('.dialog-heading p').textContent = '투자자산 정보를 확인하고 수정해 주세요.';
+  document.querySelector('.submit-button').textContent = '저장';
+  dialog.showModal();
+}
+
+function resetInvestmentForm() {
+  editingIndex = null;
+  form.reset();
+  opbInput.setCustomValidity('');
+  maturityInput.setCustomValidity('');
+  document.querySelector('#dialog-title').textContent = '투자건 등록';
+  document.querySelector('.dialog-heading .eyebrow').textContent = 'NEW INVESTMENT';
+  document.querySelector('.dialog-heading p').textContent = '새로운 투자자산 정보를 입력해 주세요.';
+  document.querySelector('.submit-button').textContent = '등록';
+}
+
+document.querySelector('#open-investment-modal').addEventListener('click', () => {
+  resetInvestmentForm();
+  dialog.showModal();
+});
+document.querySelector('#close-investment-modal').addEventListener('click', resetInvestmentForm);
+document.querySelector('#cancel-investment').addEventListener('click', resetInvestmentForm);
+dialog.addEventListener('close', resetInvestmentForm);
+dialog.addEventListener('cancel', resetInvestmentForm);
+
+returnInput.addEventListener('blur', () => {
+  if (returnInput.value && Number.isFinite(Number(returnInput.value))) {
+    returnInput.value = Number(returnInput.value).toFixed(2);
+  }
+});
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   validateOpb();
   if (!form.reportValidity()) return;
 
   const formData = new FormData(form);
-  investments.push({
+  const updatedInvestment = {
     name: formData.get('name').trim(), category: formData.get('category'), region: formData.get('region'),
     amount: Number(formData.get('amount')), opb: Number(formData.get('opb')),
-    returnRate: Number(formData.get('returnRate')), maturity: formData.get('maturity'),
-    color: String.fromCharCode(97 + investments.length % 4),
-  });
+    returnRate: Number(Number(formData.get('returnRate')).toFixed(2)), maturity: formData.get('maturity'),
+    color: editingIndex === null ? String.fromCharCode(97 + investments.length % 4) : investments[editingIndex].color,
+  };
+  if (editingIndex === null) investments.push(updatedInvestment);
+  else investments[editingIndex] = updatedInvestment;
   saveInvestments();
   renderSummary();
   renderInvestments();
   renderAllocation();
-  form.reset();
+  resetInvestmentForm();
   dialog.close();
 });
+
+const excelFileInput = document.querySelector('#excel-file-input');
+const excelResult = document.querySelector('#excel-result');
+document.querySelector('#excel-upload-button').addEventListener('click', () => excelFileInput.click());
+excelFileInput.addEventListener('change', async () => {
+  const file = excelFileInput.files?.[0];
+  excelFileInput.value = '';
+  if (!file) return;
+  if (!/\.xlsx$/i.test(file.name)) {
+    showExcelResult({ total: 0, added: 0, duplicates: 0, errors: ['.xlsx 파일을 선택해 주세요.'] });
+    return;
+  }
+  if (!window.XLSX) {
+    showExcelResult({ total: 0, added: 0, duplicates: 0, errors: ['Excel 처리 모듈을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'] });
+    return;
+  }
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new Error('Excel 파일에 시트가 없습니다.');
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: true, defval: null, blankrows: false });
+    const dataRows = rows.slice(1).map((cells, index) => ({ cells, rowNumber: index + 2 }))
+      .filter(({ cells }) => cells.some((cell) => cell !== null && String(cell).trim() !== ''));
+    const outcome = { total: dataRows.length, added: 0, duplicates: 0, errors: [] };
+    const knownNames = new Set(investments.map(({ name }) => normalizeInvestmentName(name)));
+    const additions = [];
+    const categories = new Set(['부동산', 'SOC', '선박·항공기', '유동화', '상품·파생', '기타']);
+    const regions = new Set(['국내', '북미', '중남미', '아시아', '유럽', '오세아니아', '중동']);
+    dataRows.forEach(({ cells, rowNumber }) => {
+      const [nameCell, categoryCell, regionCell, amountCell, opbCell, returnCell, maturityCell] = cells;
+      const name = String(nameCell ?? '').trim();
+      const category = String(categoryCell ?? '').trim();
+      const region = String(regionCell ?? '').trim();
+      const amount = parseExcelNumber(amountCell);
+      const opb = parseExcelNumber(opbCell);
+      const returnRate = parseExcelNumber(returnCell);
+      const maturity = parseExcelDate(maturityCell);
+      const issues = [];
+      if (!name) issues.push('투자건명');
+      if (!categories.has(category)) issues.push('자산분류');
+      if (!regions.has(region)) issues.push('투자지역');
+      if (amount === null || amount < 0) issues.push('투자금액(0 이상의 숫자)');
+      if (opb === null || opb < 0) issues.push('OPB(0 이상의 숫자)');
+      else if (amount !== null && opb > amount) issues.push('OPB(투자금액 이하)');
+      if (returnRate === null) issues.push('수익률(숫자)');
+      if (!maturity) issues.push('만기일(유효한 YYYY-MM-DD 날짜)');
+      if (issues.length) {
+        outcome.errors.push(`${rowNumber}행: ${issues.join(', ')} 항목을 확인해 주세요.`);
+        return;
+      }
+      const normalizedName = normalizeInvestmentName(name);
+      if (knownNames.has(normalizedName)) {
+        outcome.duplicates += 1;
+        return;
+      }
+      knownNames.add(normalizedName);
+      additions.push({ name, category, region, amount, opb, returnRate: Number(returnRate.toFixed(2)), maturity, color: String.fromCharCode(97 + (investments.length + additions.length) % 4) });
+    });
+    investments.push(...additions);
+    outcome.added = additions.length;
+    if (additions.length) {
+      saveInvestments();
+      renderSummary();
+      renderInvestments();
+      renderAllocation();
+    }
+    showExcelResult(outcome);
+  } catch (error) {
+    showExcelResult({ total: 0, added: 0, duplicates: 0, errors: [`파일을 읽지 못했습니다: ${error.message || '파일 형식을 확인해 주세요.'}`] });
+  }
+});
+
+document.querySelector('#excel-download-button').addEventListener('click', () => {
+  if (!window.XLSX) {
+    showExcelResult({ total: 0, added: 0, duplicates: 0, errors: ['Excel 처리 모듈을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'] });
+    return;
+  }
+  const data = [
+    ['투자건명', '자산분류', '투자지역', '투자금액', 'OPB', '수익률', '만기일'],
+    ...investments.map(({ name, category, region, amount, opb, returnRate, maturity }) => [name, category, region, amount, opb, Number(returnRate).toFixed(2), maturity]),
+  ];
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(data);
+  sheet['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(workbook, sheet, '투자건');
+  XLSX.writeFile(workbook, `투자포트폴리오_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+function normalizeInvestmentName(name) {
+  return String(name).trim().toLocaleLowerCase('ko-KR');
+}
+
+function parseExcelNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const normalized = String(value).replace(/[,%\s]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseExcelDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === 'number' && window.XLSX) {
+    const parts = XLSX.SSF.parse_date_code(value);
+    if (parts) return formatExcelDate(parts.y, parts.m, parts.d);
+  }
+  const raw = String(value ?? '').trim();
+  const match = raw.match(/^(\d{4})[-/.]?(\d{2})[-/.]?(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+function formatExcelDate(year, month, day) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function showExcelResult({ total, added, duplicates, errors }) {
+  excelResult.hidden = false;
+  excelResult.innerHTML = `<div class="excel-result-heading"><strong>Excel 처리 결과</strong><button type="button" class="excel-result-close" aria-label="결과 닫기">×</button></div><p>총 업로드 행 수 <strong>${total}</strong> · 정상 추가 <strong>${added}</strong> · 중복 건너뜀 <strong>${duplicates}</strong> · 오류 <strong>${errors.length}</strong></p>${errors.length ? `<ul>${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('')}</ul>` : ''}`;
+  excelResult.querySelector('.excel-result-close').addEventListener('click', () => { excelResult.hidden = true; });
+}

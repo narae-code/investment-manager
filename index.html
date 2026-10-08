@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#f3f5f8" />
     <title>투자 포트폴리오 | 자산관리</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -87,15 +88,18 @@
 
           <section class="analytics-grid">
             <article class="panel allocation-panel" id="allocation">
-              <div class="panel-heading">
-                <div><h2>자산분류별 투자금액</h2><p>자산 유형에 따른 투자 비중</p></div>
-                <span class="panel-unit">단위: 억원</span>
+              <div class="allocation-charts">
+                <section class="allocation-chart-card">
+                  <div class="panel-heading"><div><h2>자산분류별 투자금액</h2><p>자산 유형에 따른 투자 비중</p></div></div>
+                  <div class="chart-area"><div class="chart-center"><span>총 투자금액</span><strong id="chart-total">—</strong></div><div class="donut-chart" id="donut-chart" role="img" aria-label="자산분류별 투자금액 도넛 차트"></div></div>
+                  <div class="legend" id="chart-legend" aria-label="자산분류별 차트 범례"></div>
+                </section>
+                <section class="allocation-chart-card">
+                  <div class="panel-heading"><div><h2>투자지역별 투자금액</h2><p>지역에 따른 투자 비중</p></div></div>
+                  <div class="chart-area"><div class="chart-center"><span>총 투자금액</span><strong id="region-chart-total">—</strong></div><div class="donut-chart" id="region-donut-chart" role="img" aria-label="투자지역별 투자금액 도넛 차트"></div></div>
+                  <div class="legend" id="region-chart-legend" aria-label="투자지역별 차트 범례"></div>
+                </section>
               </div>
-              <div class="chart-area">
-                <div class="chart-center"><span>총 투자금액</span><strong id="chart-total">—</strong></div>
-                <div class="donut-chart" id="donut-chart" role="img" aria-label="자산분류별 투자금액 도넛 차트"><div class="donut-hole"></div></div>
-              </div>
-              <div class="legend" id="chart-legend" aria-label="차트 범례"></div>
             </article>
 
             <article class="panel insight-panel">
@@ -111,10 +115,11 @@
           </section>
 
           <section class="panel investments-panel" id="investments">
-            <div class="table-heading">
+              <div class="table-heading">
               <div><h2>투자건 목록</h2><p>등록된 투자자산의 상세 현황입니다.</p></div>
-              <div class="table-actions"><span class="record-count"><i></i><span id="record-count">0</span>건</span><button class="add-investment-button" id="open-investment-modal" type="button"><span aria-hidden="true">＋</span> 투자건 등록</button></div>
+              <div class="table-actions"><label class="investment-search"><span>투자건 검색</span><input id="investment-search" type="search" placeholder="투자건명을 입력하세요" autocomplete="off" aria-label="투자건명 검색"></label><span class="record-count"><i></i><span id="record-count">0</span>건</span><button class="excel-button" id="excel-upload-button" type="button">Excel 업로드</button><input id="excel-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button class="excel-button" id="excel-download-button" type="button">Excel 다운로드</button><button class="add-investment-button" id="open-investment-modal" type="button"><span aria-hidden="true">＋</span> 투자건 등록</button></div>
             </div>
+            <section class="excel-result" id="excel-result" aria-live="polite" hidden></section>
             <div class="table-wrap">
               <table>
                 <thead><tr><th scope="col">투자건명</th><th scope="col">자산분류</th><th scope="col">투자지역</th><th scope="col" class="numeric">투자금액</th><th scope="col" class="numeric">OPB</th><th scope="col" class="numeric">수익률</th><th scope="col">만기일</th><th scope="col" class="row-action-heading">관리</th></tr></thead>
