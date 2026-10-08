@@ -113,11 +113,11 @@
           <section class="panel investments-panel" id="investments">
             <div class="table-heading">
               <div><h2>투자건 목록</h2><p>등록된 투자자산의 상세 현황입니다.</p></div>
-              <span class="record-count"><i></i><span id="record-count">0</span>건</span>
+              <div class="table-actions"><span class="record-count"><i></i><span id="record-count">0</span>건</span><button class="add-investment-button" id="open-investment-modal" type="button"><span aria-hidden="true">＋</span> 투자건 등록</button></div>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th scope="col">투자건명</th><th scope="col">자산분류</th><th scope="col">투자지역</th><th scope="col" class="numeric">투자금액</th><th scope="col" class="numeric">OPB</th><th scope="col" class="numeric">수익률</th><th scope="col">만기일</th></tr></thead>
+                <thead><tr><th scope="col">투자건명</th><th scope="col">자산분류</th><th scope="col">투자지역</th><th scope="col" class="numeric">투자금액</th><th scope="col" class="numeric">OPB</th><th scope="col" class="numeric">수익률</th><th scope="col">만기일</th><th scope="col" class="row-action-heading">관리</th></tr></thead>
                 <tbody id="investment-rows"></tbody>
                 <tfoot id="investment-total-row"></tfoot>
               </table>
@@ -128,5 +128,21 @@
         </div>
       </main>
     </div>
+    <dialog class="investment-dialog" id="investment-dialog" aria-labelledby="dialog-title">
+      <form class="investment-form" id="investment-form">
+        <div class="dialog-heading"><div><div class="eyebrow">NEW INVESTMENT</div><h2 id="dialog-title">투자건 등록</h2><p>새로운 투자자산 정보를 입력해 주세요.</p></div><button class="dialog-close" type="button" id="close-investment-modal" aria-label="창 닫기">×</button></div>
+        <div class="form-grid">
+          <label class="form-field full-width" for="investment-name">투자건명 <span class="required-mark">*</span><input id="investment-name" name="name" type="text" placeholder="예: E사업" maxlength="40" required autocomplete="off" /></label>
+          <label class="form-field" for="investment-category">자산분류 <span class="required-mark">*</span><select id="investment-category" name="category" required><option value="" selected disabled>자산분류 선택</option><option>부동산</option><option>SOC</option><option>선박·항공기</option><option>유동화</option><option>상품·파생</option><option>기타</option></select></label>
+          <label class="form-field" for="investment-region">투자지역 <span class="required-mark">*</span><select id="investment-region" name="region" required><option value="" selected disabled>투자지역 선택</option><option>국내</option><option>북미</option><option>중남미</option><option>아시아</option><option>유럽</option><option>오세아니아</option><option>중동</option></select></label>
+          <label class="form-field" for="investment-amount">투자금액 <span class="required-mark">*</span><span class="input-with-unit"><input id="investment-amount" name="amount" type="number" min="0" step="any" placeholder="0" required /><span>억원</span></span></label>
+          <label class="form-field" for="investment-opb">OPB <span class="required-mark">*</span><span class="input-with-unit"><input id="investment-opb" name="opb" type="number" min="0" step="any" placeholder="0" required /><span>억원</span></span></label>
+          <label class="form-field" for="investment-return">수익률 <span class="required-mark">*</span><span class="input-with-unit"><input id="investment-return" name="returnRate" type="number" step="any" placeholder="0.0" required /><span>%</span></span></label>
+          <label class="form-field" for="investment-maturity">만기일 <span class="required-mark">*</span><input id="investment-maturity" name="maturity" type="text" inputmode="numeric" autocomplete="off" placeholder="YYYYMMDD" maxlength="10" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" title="숫자 8자리로 입력하세요. 예: 20301231" required /></label>
+        </div>
+        <p class="form-hint"><span class="required-mark">*</span> 표시는 필수 입력 항목입니다. 금액은 억원 단위로 입력해 주세요.</p>
+        <div class="dialog-actions"><button class="cancel-button" type="button" id="cancel-investment">취소</button><button class="submit-button" type="submit">등록</button></div>
+      </form>
+    </dialog>
   </body>
 </html>
