@@ -1,14 +1,34 @@
-const investments = [
+const defaultInvestments = [
   { name: 'A사업', category: '부동산', region: '국내', amount: 300, opb: 250, returnRate: 5.2, maturity: '2028-12-31', color: 'a' },
   { name: 'B사업', category: 'SOC', region: '국내', amount: 200, opb: 180, returnRate: 4.8, maturity: '2030-06-30', color: 'b' },
   { name: 'C사업', category: '선박·항공기', region: '유럽', amount: 150, opb: 120, returnRate: 6.1, maturity: '2027-09-30', color: 'c' },
   { name: 'D사업', category: '유동화', region: '북미', amount: 100, opb: 80, returnRate: 5.7, maturity: '2029-03-31', color: 'd' },
 ];
 
+const storageKey = 'vibe-coding-investments';
+function loadInvestments() {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved === null) {
+      localStorage.setItem(storageKey, JSON.stringify(defaultInvestments));
+      return defaultInvestments.map((item) => ({ ...item }));
+    }
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : defaultInvestments.map((item) => ({ ...item }));
+  } catch {
+    return defaultInvestments.map((item) => ({ ...item }));
+  }
+}
+
+const investments = loadInvestments();
+function saveInvestments() {
+  localStorage.setItem(storageKey, JSON.stringify(investments));
+}
+
 const chartColors = ['#577bd5', '#42a69a', '#8b73d2', '#d8a04f', '#ce7186', '#71869c'];
 const numberFormat = new Intl.NumberFormat('ko-KR');
 const money = (value) => `${numberFormat.format(value)}<small>억원</small>`;
-const percent = (value) => `${value.toFixed(1)}%`;
+const percent = (value) => `${Number(value).toFixed(2)}%`;
 
 function renderSummary() {
   const totalInvestment = investments.reduce((sum, item) => sum + item.amount, 0);
@@ -55,6 +75,7 @@ function renderInvestments() {
       if (!Number.isInteger(index) || index < 0 || index >= investments.length) return;
       if (!window.confirm(`${investments[index].name} 투자건을 삭제할까요?`)) return;
       investments.splice(index, 1);
+      saveInvestments();
       renderSummary();
       renderInvestments();
       renderAllocation();
@@ -149,6 +170,7 @@ form.addEventListener('submit', (event) => {
     returnRate: Number(formData.get('returnRate')), maturity: formData.get('maturity'),
     color: String.fromCharCode(97 + investments.length % 4),
   });
+  saveInvestments();
   renderSummary();
   renderInvestments();
   renderAllocation();
