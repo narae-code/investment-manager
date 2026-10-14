@@ -1,30 +1,89 @@
-const defaultInvestments = [
-  { name: 'A사업', category: '부동산', region: '국내', amount: 300, opb: 250, returnRate: 5.2, maturity: '2028-12-31', color: 'a' },
-  { name: 'B사업', category: 'SOC', region: '국내', amount: 200, opb: 180, returnRate: 4.8, maturity: '2030-06-30', color: 'b' },
-  { name: 'C사업', category: '선박·항공기', region: '유럽', amount: 150, opb: 120, returnRate: 6.1, maturity: '2027-09-30', color: 'c' },
-  { name: 'D사업', category: '유동화', region: '북미', amount: 100, opb: 80, returnRate: 5.7, maturity: '2029-03-31', color: 'd' },
-];
-
+// GitHub Pages runs this code in the browser. Only a Supabase publishable (anon) key belongs here.
+const SUPABASE_URL = 'https://datvpasbuccpxdgnfxbr.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_CSAfzzK5Sba3vREb3aF9kA_cz6kEZSC';
+const supabaseReady = SUPABASE_PUBLISHABLE_KEY !== 'PASTE_SUPABASE_PUBLISHABLE_KEY_HERE'
+  && Boolean(window.supabase?.createClient);
+const supabaseClient = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
 const storageKey = 'vibe-coding-investments';
-function loadInvestments() {
+function readLegacyInvestments() {
   try {
     const saved = localStorage.getItem(storageKey);
-    if (saved === null) {
-      localStorage.setItem(storageKey, JSON.stringify(defaultInvestments));
-      return defaultInvestments.map((item) => ({ ...item }));
-    }
+    if (saved === null) return [];
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : defaultInvestments.map((item) => ({ ...item }));
-  } catch {
-    return defaultInvestments.map((item) => ({ ...item }));
-  }
+    return Array.isArray(parsed) ? parsed.filter(isValidInvestment).map(normalizeInvestment) : [];
+  } catch { return []; }
 }
 
-const investments = loadInvestments();
+const investments = [];
+let currentUser = null;
 let searchTerm = '';
 let editingIndex = null;
-function saveInvestments() {
-  localStorage.setItem(storageKey, JSON.stringify(investments));
+let legacyInvestments = [];
+let investmentSubscription = null;
+
+function normalizeInvestment(item) {
+  return {
+    id: item.id ?? null, name: String(item.name).trim(), category: item.category, region: item.region,
+    amount: Number(item.amount), opb: Number(item.opb), returnRate: Number(item.returnRate ?? item.return_rate),
+    maturity: String(item.maturity ?? item.maturity_date).slice(0, 10), color: item.color || 'a',
+  };
+}
+
+function isValidInvestment(item) {
+  return item && typeof item.name === 'string' && typeof item.category === 'string' && typeof item.region === 'string'
+    && Number.isFinite(Number(item.amount)) && Number.isFinite(Number(item.opb))
+    && Number.isFinite(Number(item.returnRate ?? item.return_rate)) && /^\d{4}-\d{2}-\d{2}$/.test(String(item.maturity ?? item.maturity_date));
+}
+
+function toDatabaseRow(item) {
+  return { name: item.name, category: item.category, region: item.region, amount: item.amount, opb: item.opb, return_rate: item.returnRate, maturity_date: item.maturity };
+}
+
+function setAppEnabled(enabled) {
+  document.querySelector('.app-shell').inert = !enabled;
+  document.querySelector('.app-shell').setAttribute('aria-hidden', String(!enabled));
+}
+
+function setAuthMessage(message, isError = false) {
+  const element = document.querySelector('#auth-message');
+  element.textContent = message;
+  element.classList.toggle('error', isError);
+}
+
+function showAuthGate(message = '') {
+  currentUser = null;
+  investments.splice(0, investments.length);
+  setAppEnabled(false);
+  document.querySelector('#auth-gate').hidden = false;
+  document.querySelector('#migration-gate').hidden = true;
+  document.querySelector('#profile-name').textContent = '로그인 안 됨';
+  document.querySelector('#profile-email').textContent = 'Supabase 계정';
+  renderSummary(); renderInvestments(); renderAllocation();
+  setAuthMessage(message);
+}
+
+async function loadInvestments() {
+  if (!currentUser) return;
+  const { data, error } = await supabaseClient.from('investments').select('id,name,category,region,amount,opb,return_rate,maturity_date').order('created_at', { ascending: false });
+  if (error) throw error;
+  investments.splice(0, investments.length, ...(data || []).map(normalizeInvestment));
+  renderSummary(); renderInvestments(); renderAllocation();
+}
+
+async function insertInvestments(items) {
+  if (!currentUser) throw new Error('로그인이 필요합니다.');
+  if (!items.length) return [];
+  const { data, error } = await supabaseClient.from('investments').insert(items.map(toDatabaseRow)).select('id,name,category,region,amount,opb,return_rate,maturity_date');
+  if (error) throw error;
+  return (data || []).map(normalizeInvestment);
+}
+
+function displayError(error) {
+  const message = error?.message || '요청을 완료하지 못했습니다.';
+  if (/relation .* does not exist|Could not find the table/i.test(message)) return 'Supabase에 테이블이 없습니다. 제공한 supabase-setup.sql을 먼저 실행해 주세요.';
+  if (/Invalid API key|apikey/i.test(message)) return 'Publishable Key 설정을 확인해 주세요.';
+  if (/row-level security|permission denied/i.test(message)) return '데이터베이스 권한 또는 RLS 정책을 확인해 주세요.';
+  return message;
 }
 
 const chartColors = ['#577bd5', '#42a69a', '#8b73d2', '#d8a04f', '#ce7186', '#71869c'];
@@ -70,22 +129,23 @@ function renderInvestments() {
       <td class="numeric amount">${numberFormat.format(item.opb)}억</td>
       <td class="numeric return-value">${percent(item.returnRate)}</td>
       <td class="date-cell">${item.maturity.replaceAll('-', '.')}</td>
-      <td class="row-action"><button class="edit-investment-button" type="button" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 수정">수정</button><button class="delete-investment-button" type="button" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 삭제">삭제</button></td>
+      <td class="row-action"><button class="edit-investment-button" type="button" data-investment-id="${escapeHtml(item.id ?? '')}" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 수정">수정</button><button class="delete-investment-button" type="button" data-investment-id="${escapeHtml(item.id ?? '')}" data-investment-index="${index}" aria-label="${escapeHtml(item.name)} 투자건 삭제">삭제</button></td>
     </tr>`).join('');
   document.querySelector('#investment-rows').innerHTML = rows;
   document.querySelectorAll('.edit-investment-button').forEach((button) => {
     button.addEventListener('click', () => openEditDialog(Number(button.dataset.investmentIndex)));
   });
   document.querySelectorAll('.delete-investment-button').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const index = Number(button.dataset.investmentIndex);
       if (!Number.isInteger(index) || index < 0 || index >= investments.length) return;
       if (!window.confirm(`${investments[index].name} 투자건을 삭제할까요?`)) return;
-      investments.splice(index, 1);
-      saveInvestments();
-      renderSummary();
-      renderInvestments();
-      renderAllocation();
+      const item = investments[index];
+      try {
+        const { error } = await supabaseClient.from('investments').delete().eq('id', item.id);
+        if (error) throw error;
+        investments.splice(index, 1); renderSummary(); renderInvestments(); renderAllocation();
+      } catch (error) { window.alert(`삭제하지 못했습니다: ${displayError(error)}`); }
     });
   });
 
@@ -133,6 +193,93 @@ function escapeHtml(value) {
 const today = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 document.querySelector('#today').textContent = today;
 document.querySelector('#data-as-of').textContent = today;
+
+document.querySelector('#auth-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!supabaseReady) { setAuthMessage('app.js에 Supabase Publishable Key를 설정해 주세요. Secret key는 입력하지 마세요.', true); return; }
+  const form = event.currentTarget;
+  const button = document.querySelector('#sign-in-button');
+  button.disabled = true;
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email: form.elements.email.value.trim(), password: form.elements.password.value });
+    if (error) throw error;
+    setAuthMessage('로그인 중…');
+  } catch (error) { setAuthMessage(displayError(error), true); }
+  finally { button.disabled = false; }
+});
+document.querySelector('#sign-out-button').addEventListener('click', async () => {
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) window.alert(`로그아웃하지 못했습니다: ${displayError(error)}`);
+});
+
+async function showSignedInApp(user) {
+  currentUser = user;
+  document.querySelector('#profile-name').textContent = user.user_metadata?.full_name || user.email?.split('@')[0] || '사용자';
+  document.querySelector('#profile-email').textContent = user.email || '';
+  document.querySelector('#profile-avatar').textContent = (user.email || '?').slice(0, 1).toLocaleUpperCase('ko-KR');
+  try {
+    await loadInvestments();
+    if (investmentSubscription) await supabaseClient.removeChannel(investmentSubscription);
+    investmentSubscription = supabaseClient.channel('shared-investments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'investments' }, () => {
+        if (currentUser?.id === user.id) loadInvestments().catch((error) => console.error('투자 목록 새로고침 실패:', error));
+      }).subscribe();
+    document.querySelector('#auth-gate').hidden = true;
+    setAppEnabled(true);
+    legacyInvestments = readLegacyInvestments();
+    const importedKey = `vibe-coding-investments-imported:${user.id}`;
+    if (legacyInvestments.length && !localStorage.getItem(importedKey)) {
+      const existingNames = new Set(investments.map((item) => normalizeInvestmentName(item.name)));
+      const candidates = legacyInvestments.filter((item) => !existingNames.has(normalizeInvestmentName(item.name)));
+      document.querySelector('#migration-preview').innerHTML = `<p>브라우저 저장 데이터 ${legacyInvestments.length}건 · 현재 계정에 없는 이름 ${candidates.length}건</p><ul>${legacyInvestments.map((item) => `<li>${escapeHtml(item.name)} · ${numberFormat.format(item.amount)}억원${existingNames.has(normalizeInvestmentName(item.name)) ? ' (중복 예정)' : ''}</li>`).join('')}</ul>`;
+      document.querySelector('#migration-gate').hidden = false;
+      document.querySelector('#migration-confirm-checkbox').checked = false;
+      document.querySelector('#migration-import-button').disabled = true;
+      document.querySelector('#migration-message').textContent = '';
+    }
+  } catch (error) { showAuthGate(displayError(error)); }
+}
+
+document.querySelector('#migration-confirm-checkbox').addEventListener('change', (event) => {
+  document.querySelector('#migration-import-button').disabled = !event.target.checked;
+});
+document.querySelector('#migration-skip-button').addEventListener('click', () => { document.querySelector('#migration-gate').hidden = true; });
+document.querySelector('#migration-import-button').addEventListener('click', async () => {
+  const button = document.querySelector('#migration-import-button');
+  button.disabled = true;
+  try {
+    const existingNames = new Set(investments.map((item) => normalizeInvestmentName(item.name)));
+    const candidates = legacyInvestments.filter((item) => !existingNames.has(normalizeInvestmentName(item.name)));
+    const inserted = await insertInvestments(candidates);
+    investments.unshift(...inserted);
+    localStorage.setItem(`vibe-coding-investments-imported:${currentUser.id}`, new Date().toISOString());
+    renderSummary(); renderInvestments(); renderAllocation();
+    document.querySelector('#migration-message').textContent = `${inserted.length}건을 가져왔습니다. 기존 브라우저 데이터는 그대로 보존됩니다.`;
+    window.setTimeout(() => { document.querySelector('#migration-gate').hidden = true; }, 1800);
+  } catch (error) {
+    document.querySelector('#migration-message').textContent = displayError(error);
+    button.disabled = !document.querySelector('#migration-confirm-checkbox').checked;
+  }
+});
+
+if (!supabaseReady) setAuthMessage('Supabase Publishable Key 설정이 필요합니다. app.js의 SUPABASE_PUBLISHABLE_KEY를 설정해 주세요.', true);
+else {
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) window.setTimeout(() => showSignedInApp(session.user), 0);
+    else {
+      if (investmentSubscription) supabaseClient.removeChannel(investmentSubscription);
+      investmentSubscription = null;
+      showAuthGate();
+    }
+  });
+  supabaseClient.auth.getSession().then(({ data, error }) => {
+    if (error) showAuthGate(displayError(error));
+    else if (data.session?.user) showSignedInApp(data.session.user);
+    else showAuthGate();
+  }).catch((error) => showAuthGate(displayError(error)));
+}
+
+setAppEnabled(false);
 renderSummary();
 renderInvestments();
 renderAllocation();
@@ -221,26 +368,34 @@ returnInput.addEventListener('blur', () => {
   }
 });
 
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
   validateOpb();
   if (!form.reportValidity()) return;
 
   const formData = new FormData(form);
   const updatedInvestment = {
+    id: editingIndex === null ? null : investments[editingIndex].id,
     name: formData.get('name').trim(), category: formData.get('category'), region: formData.get('region'),
     amount: Number(formData.get('amount')), opb: Number(formData.get('opb')),
     returnRate: Number(Number(formData.get('returnRate')).toFixed(2)), maturity: formData.get('maturity'),
     color: editingIndex === null ? String.fromCharCode(97 + investments.length % 4) : investments[editingIndex].color,
   };
-  if (editingIndex === null) investments.push(updatedInvestment);
-  else investments[editingIndex] = updatedInvestment;
-  saveInvestments();
-  renderSummary();
-  renderInvestments();
-  renderAllocation();
-  resetInvestmentForm();
-  dialog.close();
+  const submitButton = form.querySelector('.submit-button');
+  submitButton.disabled = true;
+  try {
+    if (editingIndex === null) {
+      const [created] = await insertInvestments([updatedInvestment]);
+      investments.unshift(created);
+    } else {
+      const { data, error } = await supabaseClient.from('investments').update(toDatabaseRow(updatedInvestment)).eq('id', updatedInvestment.id).select('id,name,category,region,amount,opb,return_rate,maturity_date').single();
+      if (error) throw error;
+      investments[editingIndex] = normalizeInvestment(data);
+    }
+    renderSummary(); renderInvestments(); renderAllocation();
+    resetInvestmentForm(); dialog.close();
+  } catch (error) { window.alert(`저장하지 못했습니다: ${displayError(error)}`); }
+  finally { submitButton.disabled = false; }
 });
 
 const excelFileInput = document.querySelector('#excel-file-input');
@@ -300,10 +455,18 @@ excelFileInput.addEventListener('change', async () => {
       knownNames.add(normalizedName);
       additions.push({ name, category, region, amount, opb, returnRate: Number(returnRate.toFixed(2)), maturity, color: String.fromCharCode(97 + (investments.length + additions.length) % 4) });
     });
-    investments.push(...additions);
     outcome.added = additions.length;
     if (additions.length) {
-      saveInvestments();
+      try {
+        const inserted = await insertInvestments(additions);
+        investments.unshift(...inserted);
+        outcome.added = inserted.length;
+      } catch (error) {
+        outcome.added = 0;
+        outcome.errors.push(`Supabase 저장 실패: ${displayError(error)}`);
+      }
+    }
+    if (outcome.added) {
       renderSummary();
       renderInvestments();
       renderAllocation();
